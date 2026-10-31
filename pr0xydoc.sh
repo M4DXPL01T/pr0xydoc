@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # pr0xydoc — diagnose your own xray/v2ray proxy chain, one layer at a time.
-# https://github.com/M4DXPL0IT/pr0xydoc
+# https://github.com/M4DXPL01T/pr0xydoc
 # MIT License
 
 set -uo pipefail

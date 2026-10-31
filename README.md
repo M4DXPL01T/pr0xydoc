@@ -1,170 +1,109 @@
-<div align="center">
+# pr0xydoc
 
-<img src="docs/logo.png" alt="ListMeUp" width="80" />
+Find out which part of your proxy setup is broken, without guessing.
 
-# ListMeUp
-
-**Платформа онлайн-записи для сервисного бизнеса**
-
-Салоны красоты · Барбершопы · Стоматологии · Массажные кабинеты · Фитнес-студии
-
-[![Stack](https://img.shields.io/badge/Stack-React_+_FastAPI_+_PostgreSQL-0097A7?style=flat-square)](#tech-stack)
-[![i18n](https://img.shields.io/badge/Languages-RU_|_EN_|_ZH-26C6DA?style=flat-square)](#features)
-[![License](https://img.shields.io/badge/License-Proprietary-red?style=flat-square)](#license)
-
-</div>
-
----
-
-## О проекте
-
-**ListMeUp** — SaaS-платформа для управления записями клиентов. Владелец бизнеса настраивает услуги, команду и расписание — получает ссылку, по которой клиенты записываются самостоятельно. Без регистрации, без приложения.
-
-Разработан как полноценная альтернатива YCLIENTS, Dikidi, Booksy — с фокусом на простоту, скорость и современный дизайн.
-
----
-
-## Скриншоты
-
-<div align="center">
-
-### Публичная страница записи
-<img src="docs/screenshots/price.png" alt="Booking page" width="700" />
-
-<br/><br/>
-
-### Календарь записей
-<img src="docs/screenshots/calendar.png" alt="Calendar" width="700" />
-
-<br/><br/>
-
-### Статистика и аналитика
-<img src="docs/screenshots/stats.png" alt="Statistics" width="700" />
-
-<br/><br/>
-
-### Клиентская база
-<img src="docs/screenshots/clients.png" alt="Clients" width="700" />
-
-<br/><br/>
-
-### Управление командой
-<img src="docs/screenshots/team.png" alt="Team" width="700" />
-
-</div>
-
----
-
-## Возможности
-
-### Для владельца бизнеса
-- **Услуги и цены** — фиксированная, «от», договорная. Индивидуальные цены для каждого сотрудника
-- **Команда** — персональное расписание, отпуска, привязка услуг
-- **Календарь** — все записи на одном экране. Статусы: в работе, завершена, отменена
-- **Статус сотрудников** — кто свободен прямо сейчас, кто занят до какого времени
-- **Клиентская база** — история визитов, фильтры по давности и услугам, бейджи неактивности
-- **Статистика** — выручка (только завершённые), топ услуг, загрузка по дням, новые/уникальные клиенты
-- **Гибкие настройки** — часовой пояс, валюта, рабочие часы, минимальное время до записи
-
-### Для клиента
-- **Запись без регистрации** — выбрал услугу → специалиста → время → готово
-- **Управление записью** — перенос, отмена по ссылке
-- **Предупреждение о цене** — если у специалиста цена отличается от прайса
-- **Фильтрация слотов** — только свободное время, прошедшие слоты скрыты
-- **Мультиязычность** — интерфейс на русском, английском и китайском
-
-### Техническое
-- **Валидация** — минимальное время до записи, рабочие часы, отпуска, пересечения
-- **Ошибки на 3 языках** — 13 кодов ошибок с i18n
-- **Тёмная тема** — полная поддержка dark mode
-- **Адаптивность** — мобильные телефоны, планшеты, десктоп
-- **Безопасность** — JWT access/refresh токены, смена пароля, восстановление по email
-
----
-
-## Tech Stack
-
-| Слой | Технологии |
-|------|-----------|
-| **Frontend** | React 18, TypeScript, Tailwind CSS, TanStack Query, React Router |
-| **Backend** | Python 3.13, FastAPI, SQLAlchemy 2.0, Alembic |
-| **Database** | PostgreSQL 16 |
-| **Infra** | Docker, Docker Compose, Nginx |
-| **Email** | Resend (transactional emails) |
-| **Bot** | Telegram Bot API (уведомления, webhook) |
-| **i18n** | Custom lightweight i18n (RU / EN / ZH) |
-
----
-
-## Архитектура
+When a self-hosted xray/v2ray tunnel stops working, the symptom is always the
+same: nothing loads. The cause is not. The server may be down, its address may
+be blocked, the handshake may fail, or the traffic may be throttled a few
+kilobytes in. `pr0xydoc` walks the chain one layer at a time and tells you
+which layer gave out.
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    Nginx (reverse proxy)             │
-├──────────────────────┬──────────────────────────────┤
-│   React SPA (Vite)   │   FastAPI (Uvicorn)          │
-│   /app/*             │   /api/*                     │
-│   /b/:slug           │   /api/auth/*                │
-│                      │   /api/appointments/*        │
-│                      │   /api/services/*            │
-│                      │   /api/resources/*           │
-│                      │   /api/clients/*             │
-│                      │   /api/stats/*               │
-│                      │   /api/public/:slug/*        │
-│                      │   /api/telegram/webhook      │
-├──────────────────────┴──────────────────────────────┤
-│                  PostgreSQL 16                       │
-└─────────────────────────────────────────────────────┘
+                  ___                   _
+      ____  _____/ _ \__  ____  ______ _| |___   ___
+     / __ \/ ___/ / / / |/_/ / / / __ `/ / __ \ / __|
+    / /_/ / /  / /_/ />  </ /_/ / /_/ / / /_/ // /__
+   / .___/_/   \____/_/|_|\__, /\__,_/_/\____/ \___|
+  /_/                    /____/   d o c t o r
 ```
 
-### Структура проекта
+## Example
 
 ```
-listmeup/
-├── apps/
-│   ├── api/                  # FastAPI backend
-│   │   ├── app/
-│   │   │   ├── core/         # Config, DB, auth, email, telegram
-│   │   │   ├── models/       # SQLAlchemy models
-│   │   │   ├── routers/      # API endpoints
-│   │   │   └── main.py       # App entry point
-│   │   ├── migrations/       # Alembic migrations
-│   │   └── requirements.txt
-│   └── web/                  # React frontend
-│       ├── src/
-│       │   ├── app/          # Auth, layout, routing
-│       │   ├── i18n/         # Translations (ru/en/zh)
-│       │   ├── pages/        # Pages (app + public)
-│       │   └── shared/       # API client, components
-│       └── package.json
-└── infra/                    # Docker, Nginx configs
+1. Client configuration
+[ OK ] config: /usr/local/etc/xray/config.json
+       server:    203.0.113.10:443
+       transport: tcp / reality
+       local proxy: 127.0.0.1:10808
+
+2. Local client
+[ OK ] xray service is running
+[ OK ] local port 10808 is listening
+
+3. Reaching your server
+[ OK ] connected in 0.05s
+
+4. Tunnel
+[ OK ] tunnel is up, exit address: 198.51.100.7
+       traffic exits elsewhere — your server forwards it further on
+
+5. Throughput through the tunnel
+[ OK ] downloaded 50000000 bytes in 5.1s (9.4 MB/s)
+
+6. Your plain connection (for comparison)
+[ OK ] direct download works: 16078403 bytes in 0.4s (via mirror.yandex.ru)
+
+Summary
+Everything checks out.
 ```
 
----
+## Install
 
-## Ключевые решения
+```sh
+curl -O https://raw.githubusercontent.com/M4DXPL01T/pr0xydoc/main/pr0xydoc.sh
+chmod +x pr0xydoc.sh
+./pr0xydoc.sh
+```
 
-- **Цена фиксируется при записи** (`price_final_cents`) — корректная выручка даже если цены менялись
-- **Override цен по сотруднику** — один маникюр стоит по-разному у разных мастеров
-- **Слоты генерируются на лету** — учитывают расписание, отпуска, буферы, существующие записи
-- **"Любой специалист"** — система подбирает первого свободного, предупреждает если цена отличается
-- **Клиентская база без регистрации** — агрегация по телефону из записей
-- **Выручка считает только завершённые** — записи со статусом booked + end_at в прошлом
+Needs `bash`, `curl` and `python3` — all present on a normal Linux install.
+Run it on the machine that holds your client config: a desktop, a VPS, or a
+phone through Termux. macOS and WSL work too; the service check is skipped
+where there is no `systemd`.
 
----
+If your config lives somewhere unusual:
 
-## Статус
+```sh
+./pr0xydoc.sh -c /path/to/config.json
+```
 
-🚀 **Pre-launch** — продукт готов к деплою. В работе: Telegram-уведомления, подтверждение email, интеграция с платёжными системами.
+## What each step means
 
----
+| Step | Checks | A failure means |
+|------|--------|-----------------|
+| 1 | the client config parses, and what it points at | the config is missing or malformed |
+| 2 | the client runs and its local port listens | the client crashed or never started |
+| 3 | TCP reaches your server's address and port | the server is down, the port is closed, or the address is blocked |
+| 4 | a request actually travels through the tunnel | wrong credentials, the protocol is being cut, or a hop behind your server is broken |
+| 5 | 50 MB moves through without stalling | the session holds but transfers die — often throttling |
+| 6 | the same download without the proxy | if this fails too, your own link is limited, not the proxy |
 
-## Автор
+Step 3 taking several seconds instead of milliseconds is worth noting on its
+own: slow handshakes point at packet loss along the path rather than an
+outright block.
 
-Разработано с нуля — архитектура, бэкенд, фронтенд, деплой.
+Step 5 stopping near 16 KB is a specific pattern, not a coincidence. Some
+networks allow a connection to open and then cut it once a little data has
+moved, which leaves small requests working and everything else broken.
 
----
+## Multi-hop setups
+
+If your client connects to one server that forwards traffic to another, step 4
+tells you the exit address differs from the one you dial. That already narrows
+things down: when step 3 passes and step 4 fails, the near end is fine and the
+far hop is the suspect.
+
+What `pr0xydoc` does not do is log into that far hop for you. Checking it means
+running the same tests from the middle server over SSH — planned, not built.
+
+## Scope
+
+`pr0xydoc` reads addresses from your own client config and tests that chain.
+It takes no target as an argument, scans no ranges, and probes no port you have
+not already configured yourself. Without a config there is nothing for it to
+check.
+
+It is a diagnostic tool for infrastructure you run. Please keep it that way.
 
 ## License
 
-Proprietary. Код закрыт. Данный репозиторий — витрина проекта.
+MIT
