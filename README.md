@@ -2,13 +2,13 @@
 
 Find out which part of your proxy setup is broken, without guessing.
 
-When a self-hosted xray/v2ray tunnel stops working, the symptom is always the
-same: nothing loads. The cause is not. The server may be down, its address may
-be blocked, the handshake may fail, or the traffic may be throttled a few
-kilobytes in. And if you run a chain — a nearby server forwarding to a distant
-one — the break can be at either end.
+When a self-hosted tunnel stops working, the symptom is always the same:
+nothing loads. The cause is not. The server may be down, its address may be
+blocked, the handshake may fail, or the traffic may be throttled a few
+kilobytes in. And if you run a chain — one server forwarding to another — the
+break can be anywhere along it.
 
-`pr0xydoc` walks the chain one hop at a time and tells you which hop gave out.
+`pr0xydoc` walks the chain hop by hop and tells you where it gave out.
 
 ```
                   ___                   _
@@ -39,11 +39,12 @@ there is no `systemd`.
 ```
 1. Client configuration
 [ OK ] config: /usr/local/etc/xray/config.json
+       client:    xray
        first hop: 203.0.113.10:443  (tcp / reality)
        local proxy: 127.0.0.1:10808
 
 2. Local client
-[ OK ] xray service is running
+[ OK ] process 'xray' is running
 [ OK ] local port 10808 is listening
 
 3. Reaching the first hop
@@ -54,49 +55,52 @@ there is no `systemd`.
        the first hop forwards your traffic further on
 
 5. Throughput through the tunnel
-[ OK ] downloaded 50000000 bytes in 4.6s (10.3 MB/s)
+[ OK ] downloaded 50000000 bytes in 4.6s (10.4 MB/s)
 
 6. Your plain connection (for comparison)
-       no luck via speed.cloudflare.com (0 bytes)
-[ OK ] direct download works: 16078403 bytes in 0.4s (via mirror.yandex.ru)
+[ OK ] direct download works: 16053216 bytes in 0.4s (via mirror.yandex.ru)
 
 Summary
 Everything checks out.
-
-note: Cloudflare is unreachable directly from this network — setups that hide
-      behind Cloudflare will struggle here.
 ```
-
-That last note is the kind of thing worth knowing before you spend an evening
-rebuilding a tunnel that was never going to work on this network.
 
 ## Chains
 
-If your client connects to one server that forwards to another, step 4 says so:
-the exit address differs from the one you dial. Step 3 passing while step 4
-fails already means the near end is fine and the far hop is the suspect.
+If your client connects to one server that forwards to another, step 4 says
+so: the exit address differs from the one you dial. That alone narrows things
+down — when step 3 passes and step 4 fails, the near end is fine and something
+further out is not.
 
-To check that far hop as well, point pr0xydoc at the middle server over SSH:
+To check those hops too, name them in order:
 
 ```sh
-./pr0xydoc.sh --via user@203.0.113.10
+./pr0xydoc.sh --via root@bridge.example
+./pr0xydoc.sh --via root@bridge.example --via root@exit.example
 ```
 
 ```
-7. Next hop (via user@203.0.113.10)
-       read-only: reading status and logs, changing nothing
+7. Hop 1 — root@bridge.example
 [ OK ] SSH session established
-[ OK ] xray is running on the remote host
-       remote config: /usr/local/etc/xray/config.json
-       next hop from there: 198.51.100.7:7332  (tcp / reality)
-[ OK ] the remote host can reach 198.51.100.7:7332
-[ OK ] remote xray log looks normal (2 error lines in 10 min)
-[ OK ] the remote host itself has working outbound internet
+[ OK ] 'xray' is running here
+       forwards to: 198.51.100.7:7332  (tcp / reality)
+[ OK ] this hop can reach 198.51.100.7:7332
+[ OK ] log looks normal (3 error lines in 10 min)
+[ OK ] this hop has working outbound internet
+
+8. Hop 2 — root@exit.example  (reached through hop 1)
+[ OK ] SSH session established
+[ OK ] 'xray' is running here
+       no onward proxy outbound here — this is the exit
 ```
 
-Anything `ssh` understands works here, including a `Host` alias from your
-`~/.ssh/config`. With a key you are not asked for anything; with a password you
-are asked once, since the session is reused for every check.
+Each hop is reached **through the ones before it**, so only the first server
+has to be reachable from where you are sitting. If your exit server is blocked
+from your own network — which is often exactly why the bridge exists — pr0xydoc
+still gets there.
+
+Anything `ssh` understands works, including `Host` aliases from your
+`~/.ssh/config`. With keys you are asked for nothing; with passwords, once per
+hop.
 
 For a chain you check often, write it down once:
 
@@ -105,16 +109,16 @@ For a chain you check often, write it down once:
 ```
 
 ```sh
-VIA="user@203.0.113.10"
-REMOTE_CONFIG=""          # only if the remote config is in an unusual path
+VIA="root@bridge.example"
+VIA2="root@exit.example"
 ```
 
-After that, plain `./pr0xydoc.sh` checks the whole chain.
+After that, plain `./pr0xydoc.sh` walks the whole chain.
 
 ## It suggests, you decide
 
-pr0xydoc never restarts a service, never edits a config, and never touches
-anything on the remote side. When something needs doing, it prints the command
+pr0xydoc never restarts a service, never edits a config, and never writes
+anything on a remote host. When something needs doing, it prints the command
 and stops:
 
 ```
@@ -132,13 +136,13 @@ while you are already debugging.
 |------|--------|-----------------|
 | 1 | the client config parses, and what it points at | the config is missing or malformed |
 | 2 | the client runs and its local port listens | the client crashed or never started |
-| 3 | TCP reaches the first hop | it is down, the port is closed, or the address is blocked |
+| 3 | the first hop answers on its address and port | it is down, the port is closed, or the address is blocked |
 | 4 | a request actually travels through the tunnel | wrong credentials, the protocol is being cut, or a hop behind it is broken |
 | 5 | 50 MB moves through without stalling | the session holds but transfers die — often throttling |
 | 6 | the same download without the proxy | if this fails too, your own link is limited |
-| 7 | the next hop, over SSH | the break is beyond the first hop |
+| 7+ | each further hop, over SSH | the chain breaks at the hop that cannot reach the next |
 
-Two patterns are worth naming, because they look like "it's just slow":
+Two patterns are worth naming, because both look like "it's just slow":
 
 **Handshakes taking seconds instead of milliseconds** (step 3) point at packet
 loss along the path rather than an outright block. The connection opens, but
@@ -150,21 +154,26 @@ leaves small requests working and everything else broken.
 
 ## Protocols
 
-Step 3 checks TCP, step 4 checks whether a request survives the tunnel, step 5
-checks whether bulk traffic survives it. None of that depends on which protocol
-you run, so VLESS, VMess, Trojan, Shadowsocks and Reality are all covered, over
-TCP, WebSocket, gRPC or XHTTP. The config parser reads the standard xray/v2ray
-layout, including `vnext` and `servers` style outbounds.
+Step 3 checks that the server answers, step 4 checks whether a request survives
+the tunnel, step 5 checks whether bulk traffic survives it. None of that
+depends on which protocol you run.
 
-UDP-based transports (Hysteria, TUIC, QUIC) are a gap: step 3 would need a UDP
-probe. Patches welcome.
+| Client | Read from | Notes |
+|--------|-----------|-------|
+| xray / v2ray | `config.json` | VLESS, VMess, Trojan, Shadowsocks over TCP, WS, gRPC, XHTTP, Reality |
+| hysteria2 | `config.yaml` | QUIC/UDP |
+| tuic | `config.json` | QUIC/UDP |
+
+On UDP transports step 3 sends a QUIC-shaped probe instead of opening a
+connection. Treat the result as a hint rather than a verdict: a QUIC server
+that stays silent for a stranger looks exactly like a filtered port. Step 4 is
+what settles it.
 
 ## Scope
 
-pr0xydoc reads addresses from your own client config and tests that chain. It
-takes no target as an argument, scans no ranges, and probes no port you have
-not already configured yourself. Without a config there is nothing for it to
-check.
+pr0xydoc reads addresses from your own config and tests that chain. It takes no
+target as an argument, scans no ranges, and probes no port you have not already
+configured yourself. Without a config there is nothing for it to check.
 
 It is a diagnostic tool for infrastructure you run. Please keep it that way.
 
